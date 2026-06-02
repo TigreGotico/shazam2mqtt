@@ -98,7 +98,10 @@ class ShazamStateMachine:
             if action.get("type") == "applemusicopen":
                 url = action.get("uri", "")
                 break
-        self.mqtt.publish_match(title, subtitle, confidence=match_count, url=url)
+        artwork = track.get("images", {}).get("coverart", "")
+        self.mqtt.publish_match(
+            title, subtitle, confidence=match_count, url=url, artwork_url=artwork
+        )
 
     # ------------------------------------------------------------------ #
     # cooldown helpers

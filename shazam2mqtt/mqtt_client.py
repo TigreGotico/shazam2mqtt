@@ -27,12 +27,14 @@ class MqttClient:
         self._status_topic = f"shazam2mqtt/{config.device_name}/status"
 
         self._t_now_playing = f"shazam2mqtt/{config.device_name}/now_playing"
+        self._t_now_playing_attrs = f"shazam2mqtt/{config.device_name}/now_playing/attributes"
         self._t_status_text = f"shazam2mqtt/{config.device_name}/status_text"
         self._t_matched = f"shazam2mqtt/{config.device_name}/matched"
         self._t_track = f"shazam2mqtt/{config.device_name}/track"
         self._t_artist = f"shazam2mqtt/{config.device_name}/artist"
         self._t_confidence = f"shazam2mqtt/{config.device_name}/confidence"
         self._t_url = f"shazam2mqtt/{config.device_name}/apple_music_url"
+        self._t_artwork = f"shazam2mqtt/{config.device_name}/artwork_url"
         self._t_noise = f"shazam2mqtt/{config.device_name}/noise_level"
 
         self._listen_callback = None
@@ -105,7 +107,7 @@ class MqttClient:
         sensors = [
             (
                 f"{self.cfg.ha_discovery_prefix}/sensor/{self.cfg.device_name}_shazam_now_playing/config",
-                _sensor("Now Playing", "now_playing", self._t_now_playing, icon="mdi:music-note"),
+                _sensor("Now Playing", "now_playing", self._t_now_playing, icon="mdi:music-note", json_attributes_topic=self._t_now_playing_attrs),
             ),
             (
                 f"{self.cfg.ha_discovery_prefix}/sensor/{self.cfg.device_name}_shazam_status/config",
@@ -132,6 +134,10 @@ class MqttClient:
             (
                 f"{self.cfg.ha_discovery_prefix}/sensor/{self.cfg.device_name}_shazam_apple_music_url/config",
                 _sensor("Apple Music URL", "apple_music_url", self._t_url, icon="mdi:link"),
+            ),
+            (
+                f"{self.cfg.ha_discovery_prefix}/sensor/{self.cfg.device_name}_shazam_artwork_url/config",
+                _sensor("Artwork URL", "artwork_url", self._t_artwork, icon="mdi:image"),
             ),
             (
                 f"{self.cfg.ha_discovery_prefix}/sensor/{self.cfg.device_name}_shazam_noise_level/config",
@@ -183,35 +189,53 @@ class MqttClient:
         subtitle: str,
         confidence: int = 0,
         url: str = "",
+        artwork_url: str = "",
     ):
         """Publish a successful match to all relevant topics."""
         self._pub(self._t_now_playing, f"{title} — {subtitle}")
+        self._pub(
+            self._t_now_playing_attrs,
+            json.dumps(
+                {
+                    "artist": subtitle,
+                    "title": title,
+                    "confidence": confidence,
+                    "apple_music_url": url or "Unknown",
+                    "artwork_url": artwork_url or "Unknown",
+                }
+            ),
+        )
         self._pub(self._t_status_text, "playing")
         self._pub(self._t_matched, "ON")
         self._pub(self._t_track, title)
         self._pub(self._t_artist, subtitle)
         self._pub(self._t_confidence, str(confidence))
         self._pub(self._t_url, url or "Unknown")
+        self._pub(self._t_artwork, artwork_url or "Unknown")
         logger.info("Published match: %s — %s", title, subtitle)
 
     def publish_unknown(self, reason: str = "No match"):
         self._pub(self._t_now_playing, f"Unknown / {reason}")
+        self._pub(self._t_now_playing_attrs, "{}")
         self._pub(self._t_status_text, "unknown")
         self._pub(self._t_matched, "OFF")
         self._pub(self._t_track, "Unknown")
         self._pub(self._t_artist, "Unknown")
         self._pub(self._t_confidence, "0")
         self._pub(self._t_url, "Unknown")
+        self._pub(self._t_artwork, "Unknown")
         logger.info("Published unknown: %s", reason)
 
     def publish_silence(self):
         self._pub(self._t_now_playing, "Silence")
+        self._pub(self._t_now_playing_attrs, "{}")
         self._pub(self._t_status_text, "silence")
         self._pub(self._t_matched, "OFF")
         self._pub(self._t_track, "-")
         self._pub(self._t_artist, "-")
         self._pub(self._t_confidence, "0")
         self._pub(self._t_url, "-")
+        self._pub(self._t_artwork, "-")
         logger.info("Published silence")
 
     def publish_noise_level(self, dbfs: float):
