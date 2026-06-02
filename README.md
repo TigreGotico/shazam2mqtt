@@ -20,7 +20,9 @@ If you consume music on:
 Your dashboard can now show:
 - What's currently playing
 - The artist and track name
-- A link to the song on Apple Music
+- Album artwork (Picture Entity card)
+- A link to the song on Apple Music, Spotify, Deezer
+- Lyrics, release metadata, and related videos
 - Whether the room is silent or loud
 
 ## What it does
@@ -29,7 +31,8 @@ Your dashboard can now show:
 2. **Smart capture** — once audio is sustained for ~3 s, it records a 10-second clip.
 3. **Shazam identification** — fingerprints the clip via `pyshazam` + `shazamio_core`.
 4. **MQTT publishing** — pushes the track title, artist, and metadata to MQTT topics.
-5. **Home Assistant discovery** — automatically registers 8 entities (Now Playing, Artist, Track, Confidence, Matched, Status, Noise Level, Apple Music URL) via the MQTT integration.
+5. **Home Assistant discovery** — automatically registers 9 entities under one device (Now Playing, Artist, Track, Confidence, Matched, Status, Noise Level, Apple Music URL, Artwork URL) via the MQTT integration.
+6. **Rich JSON attributes** — the Now Playing sensor carries lyrics, genres, Spotify/Deezer links, album metadata, and related YouTube videos as attributes.
 
 ## Quick Start (Docker Compose)
 
@@ -95,6 +98,7 @@ Mic ──► Noise Gate (RMS) ──► 10 s Capture ──► Shazam API ─�
 | `shazam2mqtt/<name>/artist` | sensor | `Metallica` |
 | `shazam2mqtt/<name>/confidence` | sensor | `4` |
 | `shazam2mqtt/<name>/apple_music_url` | sensor | `https://music.apple.com/...` |
+| `shazam2mqtt/<name>/artwork_url` | sensor | `https://is1-ssl.mzstatic.com/...` |
 | `shazam2mqtt/<name>/noise_level` | sensor | `-40.0` |
 | `shazam2mqtt/<name>/command` | command in | `listen_now` |
 

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any
+from typing import Any, Dict, List
 
 import paho.mqtt.client as mqtt
 
@@ -190,21 +190,40 @@ class MqttClient:
         confidence: int = 0,
         url: str = "",
         artwork_url: str = "",
+        lyrics: str = "",
+        genres: List[str] = None,
+        spotify_url: str = "",
+        deezer_url: str = "",
+        shazam_url: str = "",
+        metadata: Dict[str, str] = None,
+        related_videos: List[str] = None,
     ):
         """Publish a successful match to all relevant topics."""
         self._pub(self._t_now_playing, f"{title} — {subtitle}")
-        self._pub(
-            self._t_now_playing_attrs,
-            json.dumps(
-                {
-                    "artist": subtitle,
-                    "title": title,
-                    "confidence": confidence,
-                    "apple_music_url": url or "Unknown",
-                    "artwork_url": artwork_url or "Unknown",
-                }
-            ),
-        )
+
+        attrs = {
+            "artist": subtitle,
+            "title": title,
+            "confidence": confidence,
+            "apple_music_url": url or "Unknown",
+            "artwork_url": artwork_url or "Unknown",
+        }
+        if lyrics:
+            attrs["lyrics"] = lyrics
+        if genres:
+            attrs["genres"] = genres
+        if spotify_url:
+            attrs["spotify_url"] = spotify_url
+        if deezer_url:
+            attrs["deezer_url"] = deezer_url
+        if shazam_url:
+            attrs["shazam_url"] = shazam_url
+        if metadata:
+            attrs["metadata"] = metadata
+        if related_videos:
+            attrs["related_videos"] = related_videos
+
+        self._pub(self._t_now_playing_attrs, json.dumps(attrs))
         self._pub(self._t_status_text, "playing")
         self._pub(self._t_matched, "ON")
         self._pub(self._t_track, title)

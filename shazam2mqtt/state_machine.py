@@ -69,38 +69,55 @@ class ShazamStateMachine:
             self.mqtt.publish_unknown("Identification error")
             return
 
-        matches = result.get("matches", [])
-        track = result.get("track", {})
-        title = track.get("title", "")
-        subtitle = track.get("subtitle", "")
-        track_key = f"{title}::{subtitle}".lower()
-
-        if matches and title:
-            logger.info("Shazam match: %s — %s (%d matches)", title, subtitle, len(matches))
-            self._publish_match(title, subtitle, track, len(matches))
-        else:
+        if not result.matched or not result.track:
             logger.info("Shazam returned no match")
             self.mqtt.publish_unknown("No match")
+            return
+
+        track = result.track
+        title = track.title
+        subtitle = track.subtitle
+        track_key = f"{title}::{subtitle}".lower()
+
+        logger.info(
+            "Shazam match: %s — %s (%d matches)",
+            title, subtitle, track.confidence,
+        )
+
+        # Try to enrich with extra metadata (lyrics, videos, sections)
+        try:
+            extra = await self.shazam.get_track_info(track.key)
+        except Exception as exc:
+            logger.warning("Could not fetch extra track info: %s", exc)
+            extra = None
+
+        self._publish_match(track, extra)
 
         # same-song cooldown extension
         if track_key and track_key == self._last_track:
-            extra = self.cfg.same_song_cooldown_seconds - self.cfg.cooldown_seconds
-            if extra > 0:
-                logger.info("Same song detected, extending cooldown by %d s", extra)
-                self._last_trigger = time.time() + extra
+            extra_cool = self.cfg.same_song_cooldown_seconds - self.cfg.cooldown_seconds
+            if extra_cool > 0:
+                logger.info("Same song detected, extending cooldown by %d s", extra_cool)
+                self._last_trigger = time.time() + extra_cool
         self._last_track = track_key
 
-    def _publish_match(self, title: str, subtitle: str, track: dict, match_count: int):
-        url = ""
-        hub = track.get("hub", {})
-        actions = hub.get("actions", [])
-        for action in actions:
-            if action.get("type") == "applemusicopen":
-                url = action.get("uri", "")
-                break
-        artwork = track.get("images", {}).get("coverart", "")
+    def _publish_match(self, track, extra_track=None):
+        """Publish a match using the rich typed Track model."""
+        # Prefer extra track data if available (has lyrics, videos, sections)
+        source = extra_track if extra_track else track
         self.mqtt.publish_match(
-            title, subtitle, confidence=match_count, url=url, artwork_url=artwork
+            title=track.title,
+            subtitle=track.subtitle,
+            confidence=track.confidence,
+            url=track.apple_music_url,
+            artwork_url=track.cover_art,
+            lyrics=source.lyrics,
+            genres=track.genres,
+            spotify_url=track.spotify_uri,
+            deezer_url=track.deezer_uri,
+            shazam_url=track.url,
+            metadata=source.metadata_table,
+            related_videos=source.related_videos,
         )
 
     # ------------------------------------------------------------------ #
