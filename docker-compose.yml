@@ -2,10 +2,8 @@ version: "3.8"
 
 services:
   shazam2mqtt:
-    build:
-      context: ../..
-      dockerfile: apps/shazam2mqtt/Dockerfile
-    image: shazam2mqtt:latest
+    build: .
+    image: ghcr.io/tigregotico/shazam2mqtt:dev
     container_name: shazam2mqtt
     restart: unless-stopped
     # Pass host ALSA device for microphone access
