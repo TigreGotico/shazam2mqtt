@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "shazam2mqtt"
+version = "0.1.0"
+description = "Shazam-to-MQTT bridge with Home Assistant auto-discovery"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "TigreGotico"},
+]
+dependencies = [
+    "aiohttp>=3.8",
+    "numpy>=1.24",
+    "paho-mqtt>=1.6",
+    "pyshazam",
+    "sounddevice>=0.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["shazam2mqtt"]

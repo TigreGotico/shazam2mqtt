@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  shazam2mqtt:
+    build:
+      context: ../..
+      dockerfile: apps/shazam2mqtt/Dockerfile
+    image: shazam2mqtt:latest
+    container_name: shazam2mqtt
+    restart: unless-stopped
+    # Pass host ALSA device for microphone access
+    devices:
+      - /dev/snd:/dev/snd
+    environment:
+      - DEVICE_NAME=${DEVICE_NAME:-shazam}
+      - MQTT_HOST=${MQTT_HOST:-localhost}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_USER=${MQTT_USER:-}
+      - MQTT_PASS=${MQTT_PASS:-}
+      - NOISE_GATE_DB=${NOISE_GATE_DB:--40}
+      - LISTEN_DURATION=${LISTEN_DURATION:-10}
+      - COOLDOWN_SECONDS=${COOLDOWN_SECONDS:-60}
+      - SAME_SONG_COOLDOWN_SECONDS=${SAME_SONG_COOLDOWN_SECONDS:-300}
+      - HA_DISCOVERY_PREFIX=${HA_DISCOVERY_PREFIX:-homeassistant}
+      - HA_ENABLED=${HA_ENABLED:-true}
+    # If your host uses PulseAudio instead of ALSA, comment out 'devices'
+    # and uncomment the lines below (adjust UID/GID if needed):
+    # volumes:
+    #   - /run/user/1000/pulse:/run/user/1000/pulse
+    #   - /etc/machine-id:/etc/machine-id:ro
+    # environment:
+    #   - PULSE_SERVER=unix:/run/user/1000/pulse/native
