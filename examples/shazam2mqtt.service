@@ -1,0 +1,27 @@
+# systemd service for running shazam2mqtt natively (non-Docker).
+# Install:
+#   sudo cp shazam2mqtt.service /etc/systemd/system/
+#   sudo systemctl enable --now shazam2mqtt
+
+[Unit]
+Description=Shazam2MQTT Bridge
+After=network.target
+
+[Service]
+Type=simple
+User=%I
+Environment=DEVICE_NAME=living_room
+Environment=MQTT_HOST=192.168.1.200
+Environment=MQTT_PORT=1883
+Environment=MQTT_USER=mqtt
+Environment=MQTT_PASS=secret
+Environment=NOISE_GATE_DB=-40
+Environment=COOLDOWN_SECONDS=60
+Environment=HA_ENABLED=true
+WorkingDirectory=/opt/shazam2mqtt
+ExecStart=/opt/shazam2mqtt/venv/bin/python -m shazam2mqtt
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
