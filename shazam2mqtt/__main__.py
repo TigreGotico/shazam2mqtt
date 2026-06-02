@@ -28,6 +28,7 @@ async def main():
     monitor = AudioMonitor(
         noise_gate_db=cfg.noise_gate_db,
         capture_duration=cfg.listen_duration,
+        sample_rate=cfg.sample_rate,
     )
 
     # graceful shutdown

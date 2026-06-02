@@ -73,6 +73,7 @@ Home Assistant will auto-discover the device under **Settings → Devices & Serv
 | `SAME_SONG_COOLDOWN_SECONDS` | `300` | Extra cooldown if the same song repeats |
 | `HA_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant MQTT discovery prefix |
 | `HA_ENABLED` | `true` | Set to `false` to disable HA discovery messages |
+| `SAMPLE_RATE` | `44100` | Audio sample rate in Hz. Try `48000` if you get PortAudio invalid-sample-rate errors. |
 
 ## Architecture
 

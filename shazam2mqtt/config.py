@@ -17,6 +17,7 @@ class Config:
     same_song_cooldown_seconds: int
     ha_discovery_prefix: str
     ha_enabled: bool
+    sample_rate: int
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -32,4 +33,5 @@ class Config:
             same_song_cooldown_seconds=int(os.getenv("SAME_SONG_COOLDOWN_SECONDS", "300")),
             ha_discovery_prefix=os.getenv("HA_DISCOVERY_PREFIX", "homeassistant"),
             ha_enabled=os.getenv("HA_ENABLED", "true").lower() in ("1", "true", "yes"),
+            sample_rate=int(os.getenv("SAMPLE_RATE", "44100")),
         )

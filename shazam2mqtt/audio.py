@@ -11,11 +11,10 @@ import sounddevice as sd
 
 logger = logging.getLogger(__name__)
 
-SAMPLE_RATE = 16000
 CHANNELS = 1
 DTYPE = np.int16
 CHUNK_SECONDS = 1
-CHUNK_SAMPLES = int(SAMPLE_RATE * CHUNK_SECONDS)
+DEFAULT_SAMPLE_RATE = 44100
 
 
 def rms_to_dbfs(rms: float) -> float:
@@ -57,7 +56,7 @@ class AudioCapture:
     def __init__(
         self,
         duration: int = 10,
-        sample_rate: int = SAMPLE_RATE,
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
         channels: int = CHANNELS,
     ):
         self.duration = duration
@@ -106,9 +105,15 @@ class AudioMonitor:
         noise_gate_db: float = -40.0,
         hysteresis_chunks: int = 3,
         capture_duration: int = 10,
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
     ):
         self.gate = NoiseGate(noise_gate_db, hysteresis_chunks)
-        self.capture = AudioCapture(duration=capture_duration)
+        self.capture = AudioCapture(
+            duration=capture_duration,
+            sample_rate=sample_rate,
+        )
+        self.sample_rate = sample_rate
+        self._chunk_samples = int(sample_rate * CHUNK_SECONDS)
 
     async def run(
         self,
@@ -116,16 +121,17 @@ class AudioMonitor:
         on_noise_level: Callable[[float], None] | None = None,
     ) -> None:
         logger.info(
-            "Audio monitor started (threshold=%.1f dBFS, hysteresis=%d s)",
+            "Audio monitor started (threshold=%.1f dBFS, hysteresis=%d s, sample_rate=%d Hz)",
             self.gate.threshold_db,
             self.gate.hysteresis_chunks,
+            self.sample_rate,
         )
         while True:
             try:
                 chunk = await asyncio.to_thread(
                     sd.rec,
-                    CHUNK_SAMPLES,
-                    samplerate=SAMPLE_RATE,
+                    self._chunk_samples,
+                    samplerate=self.sample_rate,
                     channels=CHANNELS,
                     dtype=DTYPE,
                     blocking=True,
