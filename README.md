@@ -29,10 +29,11 @@ Your dashboard can now show:
 
 1. **Noise-gated listening** — continuously monitors ambient audio using an RMS threshold (`NOISE_GATE_DB`).
 2. **Smart capture** — once audio is sustained for ~3 s, it records a 10-second clip.
-3. **Shazam identification** — fingerprints the clip via `xazam` + `shazamio_core`.
-4. **MQTT publishing** — pushes the track title, artist, and metadata to MQTT topics.
-5. **Home Assistant discovery** — automatically registers 9 entities under one device (Now Playing, Artist, Track, Confidence, Matched, Status, Noise Level, Apple Music URL, Artwork URL) via the MQTT integration.
-6. **Rich JSON attributes** — the Now Playing sensor carries lyrics, genres, Spotify/Deezer links, album metadata, and related YouTube videos as attributes.
+3. **Shazam identification** — fingerprints the clip via [`xazam`](https://pypi.org/project/xazam/) + `shazamio_core`.
+4. **Extra track info** — after a match, queries Shazam for lyrics, release metadata (album, label, date), and related YouTube videos.
+5. **MQTT publishing** — pushes the track title, artist, and metadata to MQTT topics.
+6. **Home Assistant discovery** — registers **10 entities under one "Shazam" device** via the MQTT integration.
+7. **Rich JSON attributes** — the Now Playing sensor carries lyrics, genres, Spotify/Deezer links, album metadata, and related YouTube videos as attributes.
 
 ## Quick Start (Docker Compose)
 
@@ -46,19 +47,23 @@ MQTT_USER=mqtt
 MQTT_PASS=secret
 NOISE_GATE_DB=-40
 LISTEN_DURATION=10
-COOLDOWN_SECONDS=60
-SAME_SONG_COOLDOWN_SECONDS=300
+COOLDOWN_SECONDS=10
+SAME_SONG_COOLDOWN_SECONDS=30
+SAMPLE_RATE=44100
 ```
 
 3. **Run:**
 
 ```bash
-docker compose up --build
+docker compose pull
+docker compose up -d
 ```
 
 Home Assistant will auto-discover the device under **Settings → Devices & Services → MQTT**.
 
 ## Environment Variables
+
+All settings are optional — sensible defaults are baked in.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -75,21 +80,104 @@ Home Assistant will auto-discover the device under **Settings → Devices & Serv
 | `HA_ENABLED` | `true` | Set to `false` to disable HA discovery messages |
 | `SAMPLE_RATE` | `44100` | Audio sample rate in Hz. Try `48000` if you get PortAudio invalid-sample-rate errors. |
 | `SOUND_DEVICE` | *(none)* | PortAudio device index. Set if the default input device is wrong. Check container logs for the device list. |
+| `ALSA_CARD` | *(none)* | ALSA card name (e.g. `C615`). Forces the default capture device on PipeWire/ALSA hosts without fiddling with PortAudio indices. |
 | `NOISE_LEVEL_INTERVAL` | `5.0` | Minimum seconds between Noise Level sensor MQTT updates. |
 | `NOISE_LEVEL_DELTA` | `3.0` | dB change required to publish a Noise Level update immediately, bypassing the interval. |
+
+### Tuning the noise gate
+
+If music is playing but the gate never triggers:
+- Check the **Noise Level** sensor in HA. If it stays below your threshold, lower `NOISE_GATE_DB` (e.g. `-60`).
+- If the value is stuck at `-75` even during playback, your mic gain is too low or the wrong device is selected.
+
+### Tuning cooldowns
+
+| Scenario | Suggested values |
+|----------|------------------|
+| Fast switching (radio, shuffle) | `COOLDOWN_SECONDS=5` `SAME_SONG_COOLDOWN_SECONDS=10` |
+| Normal listening | `COOLDOWN_SECONDS=10` `SAME_SONG_COOLDOWN_SECONDS=30` *(defaults)* |
+| Long tracks / ambient | `COOLDOWN_SECONDS=15` `SAME_SONG_COOLDOWN_SECONDS=120` |
 
 ## Architecture
 
 ```
-Mic ──► Noise Gate (RMS) ──► 10 s Capture ──► Shazam API ──► MQTT ──► Home Assistant
-                    │
-                    └── "listen_now" command from HA
+Mic ──► Noise Gate (RMS) ──► 10 s Capture ──► xazam.identify()
+                                                   │
+                                                   ▼
+                                          get_track_info() ──► lyrics, metadata, videos
+                                                   │
+                                                   ▼
+                                               MQTT ──► Home Assistant
 ```
 
 - **Idle loop** reads 1-second audio chunks and checks RMS energy.
 - **Trigger** requires 3 consecutive "loud" chunks (~3 s hysteresis) to avoid reacting to pops.
 - **State machine** prevents overlapping captures and rate-limits the Shazam API.
 - **Command topic** `shazam2mqtt/<device_name>/command` accepts `listen_now` for manual triggers.
+
+## Home Assistant entities (10 under one device)
+
+| Entity | Type | Payload / Example |
+|--------|------|-------------------|
+| Now Playing | sensor + attrs | `Nothing Else Matters — Metallica` + JSON attrs |
+| Status | sensor | `playing` / `unknown` / `silence` |
+| Matched | binary_sensor | `ON` / `OFF` |
+| Track | sensor | `Nothing Else Matters` |
+| Artist | sensor | `Metallica` |
+| Confidence | sensor | `4` (match count) |
+| Apple Music URL | sensor | `https://music.apple.com/...` |
+| Artwork URL | sensor | `https://is1-ssl.mzstatic.com/...` |
+| Noise Level | sensor | `-40.0` dBFS |
+| Command | command in | `listen_now` |
+
+The **Now Playing** sensor carries rich JSON attributes:
+```json
+{
+  "artist": "Metallica",
+  "title": "Nothing Else Matters",
+  "confidence": 4,
+  "apple_music_url": "...",
+  "artwork_url": "...",
+  "spotify_url": "...",
+  "deezer_url": "...",
+  "shazam_url": "...",
+  "lyrics": "...",
+  "genres": ["Metal"],
+  "metadata": {"Album": "Metallica", "Released": "1991", "Label": "Elektra"},
+  "related_videos": ["https://youtube.com/watch?v=..."]
+}
+```
+
+### Dashboard tips
+
+- **Artwork:** add a Picture Entity card that uses the `Artwork URL` sensor.
+- **Now Playing details:** add a Markdown card with `{{ state_attr('sensor.living_room_shazam_now_playing', 'lyrics') }}`.
+- **Quick link:** add a button that opens `{{ state_attr('sensor.living_room_shazam_now_playing', 'apple_music_url') }}`.
+
+## Audio Backends
+
+### ALSA (default)
+The `docker-compose.yml` passes `/dev/snd` into the container. This works on most headless Linux hosts.
+
+### PipeWire
+If your host runs PipeWire, set the ALSA card name so the container uses the right mic:
+
+```bash
+# Find your capture card name on the host
+arecord -l
+# Look for: card X: NAME [Human Readable Name]
+# Example: card 3: C615 [HD Webcam C615]
+```
+
+Then in `.env`:
+```bash
+ALSA_CARD=C615
+```
+
+This is cleaner than `SOUND_DEVICE` because it survives card-number reordering.
+
+### PulseAudio (legacy)
+If your host uses pure PulseAudio (not PipeWire), comment out the `devices:` block and uncomment the `volumes:` / `PULSE_SERVER` lines in `docker-compose.yml`.
 
 ## MQTT Topics
 
@@ -106,13 +194,55 @@ Mic ──► Noise Gate (RMS) ──► 10 s Capture ──► Shazam API ─�
 | `shazam2mqtt/<name>/noise_level` | sensor | `-40.0` |
 | `shazam2mqtt/<name>/command` | command in | `listen_now` |
 
-## Audio Backends
+## Troubleshooting
 
-### ALSA (default)
-The `docker-compose.yml` passes `/dev/snd` into the container. This works on most headless Linux hosts.
+### "No audio device found"
+Make sure the container has access to `/dev/snd` or the PulseAudio socket. On the host:
+```bash
+arecord -l
+```
+If no capture devices appear, the host itself can't see a mic.
 
-### PulseAudio / PipeWire
-If your host uses PulseAudio, comment out the `devices:` block and uncomment the `volumes:` and `PULSE_SERVER` lines in `docker-compose.yml`.
+### "Invalid sample rate" (PortAudio error -9997)
+The mic doesn't support the default 44100 Hz. Try:
+```bash
+SAMPLE_RATE=48000
+```
+Or for cheap webcams:
+```bash
+SAMPLE_RATE=16000
+```
+
+### Noise level stuck at -75 dBFS (silence) even when music is playing
+The container is reading from the wrong device or the capture volume is muted.
+
+1. Check the startup logs for the device list:
+   ```bash
+   docker logs shazam2mqtt --tail 20
+   ```
+2. If the default device looks wrong, set the correct one:
+   ```bash
+   # Option A: PipeWire / ALSA card name (recommended)
+   ALSA_CARD=C615
+
+   # Option B: PortAudio device index
+   SOUND_DEVICE=2
+   ```
+3. Check host ALSA capture volume:
+   ```bash
+   alsamixer -c 2   # replace 2 with your card number
+   ```
+   Press `F4` for Capture view, make sure it's not muted (`MM`) and volume is high.
+
+### "No matches" constantly
+- Lower `NOISE_GATE_DB` (e.g. `-60`) so quieter audio triggers the gate.
+- Move the mic closer to the speakers.
+- Increase `LISTEN_DURATION` to give Shazam more audio to fingerprint.
+
+### Entity not appearing in HA
+- Check that the MQTT integration is enabled in Home Assistant.
+- Verify `HA_ENABLED=true`.
+- Check the broker credentials (`MQTT_HOST`, `MQTT_USER`, `MQTT_PASS`) are correct.
 
 ## Non-Docker Usage
 
@@ -122,12 +252,6 @@ export DEVICE_NAME=my_room
 export MQTT_HOST=192.168.1.200
 python -m shazam2mqtt
 ```
-
-## Troubleshooting
-
-- **"No audio device found"** — make sure the container has access to `/dev/snd` or the PulseAudio socket.
-- **"No matches" constantly** — lower `NOISE_GATE_DB` (e.g. `-50`) or move the mic closer to the speakers.
-- **Entity not appearing in HA** — check that the MQTT integration is enabled in Home Assistant and that `HA_ENABLED=true`.
 
 ## License
 
