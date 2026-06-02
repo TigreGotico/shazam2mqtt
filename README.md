@@ -1,6 +1,27 @@
 # shazam2mqtt
 
-A Dockerised bridge that listens to your local microphone, recognises music with Shazam, and publishes the result to MQTT — including Home Assistant auto-discovery.
+> **Because vinyl, tapes, and CDs don't have an API.**
+
+`shazam2mqtt` is a Dockerised bridge that listens to your room, recognises whatever music is playing via Shazam, and publishes the result to MQTT — including Home Assistant auto-discovery.
+
+## Why shazam2mqtt?
+
+Streaming services expose what you're playing natively. **Physical media doesn't.**
+
+If you consume music on:
+- **Vinyl**
+- **Cassette tapes**
+- **CDs**
+- **Radio**
+- ...or anything else that doesn't have a Spotify API endpoint
+
+...then Home Assistant has no idea what's spinning. `shazam2mqtt` fixes that by placing a microphone near your speakers, fingerprinting the audio with Shazam, and pushing the track metadata straight into HA.
+
+Your dashboard can now show:
+- What's currently playing
+- The artist and track name
+- A link to the song on Apple Music
+- Whether the room is silent or loud
 
 ## What it does
 
@@ -8,7 +29,7 @@ A Dockerised bridge that listens to your local microphone, recognises music with
 2. **Smart capture** — once audio is sustained for ~3 s, it records a 10-second clip.
 3. **Shazam identification** — fingerprints the clip via `pyshazam` + `shazamio_core`.
 4. **MQTT publishing** — pushes the track title, artist, and metadata to MQTT topics.
-5. **Home Assistant discovery** — automatically registers a sensor entity (`<device_name>_shazam_now_playing`) via the MQTT integration.
+5. **Home Assistant discovery** — automatically registers 8 entities (Now Playing, Artist, Track, Confidence, Matched, Status, Noise Level, Apple Music URL) via the MQTT integration.
 
 ## Quick Start (Docker Compose)
 
@@ -32,7 +53,7 @@ SAME_SONG_COOLDOWN_SECONDS=300
 docker compose up --build
 ```
 
-Home Assistant will auto-discover the sensor under **Settings → Devices & Services → MQTT**.
+Home Assistant will auto-discover the device under **Settings → Devices & Services → MQTT**.
 
 ## Environment Variables
 
@@ -68,8 +89,13 @@ Mic ──► Noise Gate (RMS) ──► 10 s Capture ──► Shazam API ─�
 | Topic | Type | Payload example |
 |-------|------|-----------------|
 | `shazam2mqtt/<name>/now_playing` | state | `Nothing Else Matters — Metallica` |
-| `shazam2mqtt/<name>/attributes` | attributes | `{"artist":"Metallica","title":"...","confidence":4}` |
-| `shazam2mqtt/<name>/status` | availability | `online` / `offline` (LWT) |
+| `shazam2mqtt/<name>/status` | status | `playing` / `unknown` / `silence` |
+| `shazam2mqtt/<name>/matched` | binary | `ON` / `OFF` |
+| `shazam2mqtt/<name>/track` | sensor | `Nothing Else Matters` |
+| `shazam2mqtt/<name>/artist` | sensor | `Metallica` |
+| `shazam2mqtt/<name>/confidence` | sensor | `4` |
+| `shazam2mqtt/<name>/apple_music_url` | sensor | `https://music.apple.com/...` |
+| `shazam2mqtt/<name>/noise_level` | sensor | `-40.0` |
 | `shazam2mqtt/<name>/command` | command in | `listen_now` |
 
 ## Audio Backends
