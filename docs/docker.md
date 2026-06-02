@@ -7,7 +7,7 @@ cd apps/shazam2mqtt
 docker build -t shazam2mqtt .
 ```
 
-For a private `pyshazam` dependency, pass a GitHub token:
+For a private `shazampy` dependency, pass a GitHub token:
 
 ```bash
 docker build --build-arg GITHUB_TOKEN=$GH_TOKEN -t shazam2mqtt .

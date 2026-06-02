@@ -16,7 +16,7 @@ dependencies = [
     "aiohttp>=3.8",
     "numpy>=1.24",
     "paho-mqtt>=1.6",
-    "pyshazam",
+    "shazampy",
     "sounddevice>=0.4",
 ]
 
