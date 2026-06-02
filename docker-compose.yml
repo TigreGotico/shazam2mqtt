@@ -2,7 +2,6 @@ version: "3.8"
 
 services:
   shazam2mqtt:
-    build: .
     image: ghcr.io/tigregotico/shazam2mqtt:dev
     container_name: shazam2mqtt
     restart: unless-stopped

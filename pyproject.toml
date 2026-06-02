@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "shazam2mqtt"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Shazam-to-MQTT bridge with Home Assistant auto-discovery"
 readme = "README.md"
 license = {text = "MIT"}
@@ -19,6 +19,10 @@ dependencies = [
     "xazam",
     "sounddevice>=0.4",
 ]
+
+[tool.hatch.version]
+path = "shazam2mqtt/version.py"
+pattern = "VERSION_MAJOR = (?P<major>\\d+)\\nVERSION_MINOR = (?P<minor>\\d+)\\nVERSION_BUILD = (?P<patch>\\d+)\\nVERSION_ALPHA = (?P<release>\\d+)"
 
 [tool.hatch.build.targets.wheel]
 packages = ["shazam2mqtt"]
