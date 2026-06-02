@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.1a3](https://github.com/TigreGotico/shazam2mqtt/tree/0.1.1a3) (2026-06-02)
+
+[Full Changelog](https://github.com/TigreGotico/shazam2mqtt/compare/0.1.1a2...0.1.1a3)
+
+**Merged pull requests:**
+
+- chore: Configure Renovate [\#1](https://github.com/TigreGotico/shazam2mqtt/pull/1) ([renovate[bot]](https://github.com/apps/renovate))
+
+## [0.1.1a2](https://github.com/TigreGotico/shazam2mqtt/tree/0.1.1a2) (2026-06-02)
+
+[Full Changelog](https://github.com/TigreGotico/shazam2mqtt/compare/0.1.1a1...0.1.1a2)
+
 ## [0.1.1a1](https://github.com/TigreGotico/shazam2mqtt/tree/0.1.1a1) (2026-06-02)
 
 [Full Changelog](https://github.com/TigreGotico/shazam2mqtt/compare/7d78c385f443e012d2bcec037040709402f2ebfe...0.1.1a1)
