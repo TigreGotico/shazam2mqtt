@@ -34,13 +34,22 @@ class ShazamStateMachine:
         if self._busy:
             logger.debug("Already busy, ignoring trigger")
             return
-        if not self._cooldown_elapsed():
-            remaining = self.cfg.cooldown_seconds - (time.time() - self._last_trigger)
-            logger.debug("Cooldown active (%.1f s left), ignoring trigger", remaining)
+
+        elapsed = time.time() - self._last_trigger
+        active_cooldown = self._active_cooldown()
+        if elapsed < active_cooldown:
+            remaining = active_cooldown - elapsed
+            logger.debug(
+                "Cooldown active (%.1f s left, mode=%s)",
+                remaining,
+                "same-song" if self._same_song_flag else "normal",
+            )
             return
 
         self._busy = True
         self._last_trigger = time.time()
+        # Reset same-song flag; will be set again if this trigger yields the same track
+        self._same_song_flag = False
         try:
             await self._identify_and_publish(wav_bytes)
         finally:
@@ -93,12 +102,15 @@ class ShazamStateMachine:
 
         self._publish_match(track, extra)
 
-        # same-song cooldown extension
+        # Same-song cooldown
         if track_key and track_key == self._last_track:
-            extra_cool = self.cfg.same_song_cooldown_seconds - self.cfg.cooldown_seconds
-            if extra_cool > 0:
-                logger.info("Same song detected, extending cooldown by %d s", extra_cool)
-                self._last_trigger = time.time() + extra_cool
+            self._same_song_flag = True
+            logger.info(
+                "Same song detected — next cooldown will be %d s",
+                self.cfg.same_song_cooldown_seconds,
+            )
+        else:
+            self._same_song_flag = False
         self._last_track = track_key
 
     def _publish_match(self, track, extra_track=None):
@@ -124,5 +136,8 @@ class ShazamStateMachine:
     # cooldown helpers
     # ------------------------------------------------------------------ #
 
-    def _cooldown_elapsed(self) -> bool:
-        return time.time() - self._last_trigger >= self.cfg.cooldown_seconds
+    def _active_cooldown(self) -> int:
+        """Return the cooldown duration that currently applies."""
+        if getattr(self, "_same_song_flag", False):
+            return self.cfg.same_song_cooldown_seconds
+        return self.cfg.cooldown_seconds

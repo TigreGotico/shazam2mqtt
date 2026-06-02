@@ -69,8 +69,8 @@ Home Assistant will auto-discover the device under **Settings → Devices & Serv
 | `MQTT_PASS` | *(none)* | MQTT password |
 | `NOISE_GATE_DB` | `-40` | dBFS threshold. Audio quieter than this is considered silence. |
 | `LISTEN_DURATION` | `10` | Seconds of audio to capture for Shazam recognition |
-| `COOLDOWN_SECONDS` | `60` | Minimum seconds between recognition attempts |
-| `SAME_SONG_COOLDOWN_SECONDS` | `300` | Extra cooldown if the same song repeats |
+| `COOLDOWN_SECONDS` | `10` | Minimum seconds between any two recognition attempts |
+| `SAME_SONG_COOLDOWN_SECONDS` | `30` | Cooldown used instead of the normal one when the same song is detected twice in a row. Set higher to avoid re-identifying the same long track. |
 | `HA_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant MQTT discovery prefix |
 | `HA_ENABLED` | `true` | Set to `false` to disable HA discovery messages |
 | `SAMPLE_RATE` | `44100` | Audio sample rate in Hz. Try `48000` if you get PortAudio invalid-sample-rate errors. |
