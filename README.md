@@ -29,7 +29,7 @@ Your dashboard can now show:
 
 1. **Noise-gated listening** — continuously monitors ambient audio using an RMS threshold (`NOISE_GATE_DB`).
 2. **Smart capture** — once audio is sustained for ~3 s, it records a 10-second clip.
-3. **Shazam identification** — fingerprints the clip via `shazampy` + `shazamio_core`.
+3. **Shazam identification** — fingerprints the clip via `xazam` + `shazamio_core`.
 4. **MQTT publishing** — pushes the track title, artist, and metadata to MQTT topics.
 5. **Home Assistant discovery** — automatically registers 9 entities under one device (Now Playing, Artist, Track, Confidence, Matched, Status, Noise Level, Apple Music URL, Artwork URL) via the MQTT integration.
 6. **Rich JSON attributes** — the Now Playing sensor carries lyrics, genres, Spotify/Deezer links, album metadata, and related YouTube videos as attributes.

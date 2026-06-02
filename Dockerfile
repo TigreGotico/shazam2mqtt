@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM python:3.11-slim
 
-# Install system dependencies for audio, build, and git (for shazampy install)
+# Install system dependencies for audio, build, and git (for xazam install)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libportaudio2 \
     alsa-utils \
@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 1. Install shazampy from its GitHub repo (dev branch).
+# 1. Install xazam from its GitHub repo (dev branch).
 #    Pass GITHUB_TOKEN if the repo is private.
 ARG GITHUB_TOKEN
 RUN if [ -n "$GITHUB_TOKEN" ]; then \
