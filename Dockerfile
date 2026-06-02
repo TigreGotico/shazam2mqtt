@@ -11,9 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 1. Install pyshazam from its GitHub repo (dev branch)
-RUN pip install --no-cache-dir \
-    "git+https://github.com/TigreGotico/pyshazam.git@dev"
+# 1. Install pyshazam from its GitHub repo (dev branch).
+#    Pass GITHUB_TOKEN if the repo is private.
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+      pip install --no-cache-dir \
+        "git+https://${GITHUB_TOKEN}@github.com/TigreGotico/pyshazam.git@dev"; \
+    else \
+      pip install --no-cache-dir \
+        "git+https://github.com/TigreGotico/pyshazam.git@dev"; \
+    fi
 
 # 2. Install shazam2mqtt
 COPY pyproject.toml ./
