@@ -19,6 +19,8 @@ class Config:
     ha_enabled: bool
     sample_rate: int
     sound_device: int | None
+    noise_level_interval: float
+    noise_level_delta: float
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -37,4 +39,6 @@ class Config:
             ha_enabled=os.getenv("HA_ENABLED", "true").lower() in ("1", "true", "yes"),
             sample_rate=int(os.getenv("SAMPLE_RATE", "44100")),
             sound_device=int(raw_device) if raw_device else None,
+            noise_level_interval=float(os.getenv("NOISE_LEVEL_INTERVAL", "5.0")),
+            noise_level_delta=float(os.getenv("NOISE_LEVEL_DELTA", "3.0")),
         )

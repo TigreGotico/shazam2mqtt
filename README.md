@@ -75,6 +75,8 @@ Home Assistant will auto-discover the device under **Settings → Devices & Serv
 | `HA_ENABLED` | `true` | Set to `false` to disable HA discovery messages |
 | `SAMPLE_RATE` | `44100` | Audio sample rate in Hz. Try `48000` if you get PortAudio invalid-sample-rate errors. |
 | `SOUND_DEVICE` | *(none)* | PortAudio device index. Set if the default input device is wrong. Check container logs for the device list. |
+| `NOISE_LEVEL_INTERVAL` | `5.0` | Minimum seconds between Noise Level sensor MQTT updates. |
+| `NOISE_LEVEL_DELTA` | `3.0` | dB change required to publish a Noise Level update immediately, bypassing the interval. |
 
 ## Architecture
 

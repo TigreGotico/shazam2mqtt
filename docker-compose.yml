@@ -22,6 +22,8 @@ services:
       - HA_ENABLED=${HA_ENABLED:-true}
       - SAMPLE_RATE=${SAMPLE_RATE:-44100}
       - SOUND_DEVICE=${SOUND_DEVICE:-}
+      - NOISE_LEVEL_INTERVAL=${NOISE_LEVEL_INTERVAL:-5.0}
+      - NOISE_LEVEL_DELTA=${NOISE_LEVEL_DELTA:-3.0}
     # If your host uses PulseAudio instead of ALSA, comment out 'devices'
     # and uncomment the lines below (adjust UID/GID if needed):
     # volumes:

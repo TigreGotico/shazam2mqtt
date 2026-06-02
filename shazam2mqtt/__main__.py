@@ -30,6 +30,8 @@ async def main():
         capture_duration=cfg.listen_duration,
         sample_rate=cfg.sample_rate,
         device=cfg.sound_device,
+        noise_level_interval=cfg.noise_level_interval,
+        noise_level_delta=cfg.noise_level_delta,
     )
 
     # graceful shutdown

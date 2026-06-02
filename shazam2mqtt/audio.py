@@ -16,8 +16,6 @@ CHANNELS = 1
 DTYPE = np.int16
 CHUNK_SECONDS = 1
 DEFAULT_SAMPLE_RATE = 44100
-NOISE_LEVEL_MIN_INTERVAL = 5.0   # seconds between MQTT publishes
-NOISE_LEVEL_MIN_DELTA = 3.0        # dB — publish immediately if change exceeds this
 
 
 def rms_to_dbfs(rms: float) -> float:
@@ -129,8 +127,8 @@ class NoiseLevelThrottler:
     def __init__(
         self,
         callback: Callable[[float], None],
-        min_interval: float = NOISE_LEVEL_MIN_INTERVAL,
-        min_delta: float = NOISE_LEVEL_MIN_DELTA,
+        min_interval: float = 5.0,
+        min_delta: float = 3.0,
     ):
         self.callback = callback
         self.min_interval = min_interval
@@ -164,6 +162,8 @@ class AudioMonitor:
         capture_duration: int = 10,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         device: int | None = None,
+        noise_level_interval: float = 5.0,
+        noise_level_delta: float = 3.0,
     ):
         self.gate = NoiseGate(noise_gate_db, hysteresis_chunks)
         self.capture = AudioCapture(
@@ -173,6 +173,8 @@ class AudioMonitor:
         )
         self.sample_rate = sample_rate
         self.device = device
+        self.noise_level_interval = noise_level_interval
+        self.noise_level_delta = noise_level_delta
         self._chunk_samples = int(sample_rate * CHUNK_SECONDS)
 
     async def run(
@@ -190,7 +192,15 @@ class AudioMonitor:
             self.device if self.device is not None else "default",
         )
 
-        throttler = NoiseLevelThrottler(on_noise_level) if on_noise_level else None
+        throttler = (
+            NoiseLevelThrottler(
+                on_noise_level,
+                min_interval=self.noise_level_interval,
+                min_delta=self.noise_level_delta,
+            )
+            if on_noise_level
+            else None
+        )
 
         while True:
             try:
