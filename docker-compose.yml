@@ -21,6 +21,7 @@ services:
       - HA_DISCOVERY_PREFIX=${HA_DISCOVERY_PREFIX:-homeassistant}
       - HA_ENABLED=${HA_ENABLED:-true}
       - SAMPLE_RATE=${SAMPLE_RATE:-44100}
+      - SOUND_DEVICE=${SOUND_DEVICE:-}
     # If your host uses PulseAudio instead of ALSA, comment out 'devices'
     # and uncomment the lines below (adjust UID/GID if needed):
     # volumes:

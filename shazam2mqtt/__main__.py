@@ -29,6 +29,7 @@ async def main():
         noise_gate_db=cfg.noise_gate_db,
         capture_duration=cfg.listen_duration,
         sample_rate=cfg.sample_rate,
+        device=cfg.sound_device,
     )
 
     # graceful shutdown

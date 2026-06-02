@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 import wave
 from io import BytesIO
 from typing import Callable
@@ -15,6 +16,8 @@ CHANNELS = 1
 DTYPE = np.int16
 CHUNK_SECONDS = 1
 DEFAULT_SAMPLE_RATE = 44100
+NOISE_LEVEL_MIN_INTERVAL = 5.0   # seconds between MQTT publishes
+NOISE_LEVEL_MIN_DELTA = 3.0        # dB — publish immediately if change exceeds this
 
 
 def rms_to_dbfs(rms: float) -> float:
@@ -27,6 +30,24 @@ def rms_to_dbfs(rms: float) -> float:
 def compute_dbfs(chunk: np.ndarray) -> float:
     rms = np.sqrt(np.mean(chunk.astype(np.float64) ** 2))
     return rms_to_dbfs(rms)
+
+
+def list_input_devices() -> str:
+    """Return a human-readable list of available input devices."""
+    try:
+        devices = sd.query_devices()
+        lines = ["Available audio devices:"]
+        for i, dev in enumerate(devices):
+            if dev["max_input_channels"] > 0:
+                default_marker = " (DEFAULT)" if i == sd.default.device[0] else ""
+                lines.append(
+                    f"  [{i}] {dev['name']} — "
+                    f"{dev['max_input_channels']} ch @ {int(dev['default_samplerate'])} Hz"
+                    f"{default_marker}"
+                )
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"Could not list audio devices: {exc}"
 
 
 class NoiseGate:
@@ -58,22 +79,30 @@ class AudioCapture:
         duration: int = 10,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         channels: int = CHANNELS,
+        device: int | None = None,
     ):
         self.duration = duration
         self.sample_rate = sample_rate
         self.channels = channels
+        self.device = device
+
+    def _rec_kwargs(self, frames: int) -> dict:
+        kwargs = {
+            "frames": frames,
+            "samplerate": self.sample_rate,
+            "channels": self.channels,
+            "dtype": DTYPE,
+            "blocking": True,
+        }
+        if self.device is not None:
+            kwargs["device"] = self.device
+        return kwargs
 
     def capture(self) -> bytes:
         """Record and return raw int16 mono bytes (not WAV wrapped)."""
         logger.info("Capturing %d s of audio …", self.duration)
         frames = self.duration * self.sample_rate
-        recording = sd.rec(
-            frames,
-            samplerate=self.sample_rate,
-            channels=self.channels,
-            dtype=DTYPE,
-            blocking=True,
-        )
+        recording = sd.rec(**self._rec_kwargs(frames))
         return recording.tobytes()
 
     def capture_to_wav(self) -> bytes:
@@ -92,6 +121,34 @@ class AudioCapture:
         return await asyncio.to_thread(self.capture_to_wav)
 
 
+class NoiseLevelThrottler:
+    """Throttle noise-level MQTT publishes: only emit when the value
+    changes significantly or enough time has passed.
+    """
+
+    def __init__(
+        self,
+        callback: Callable[[float], None],
+        min_interval: float = NOISE_LEVEL_MIN_INTERVAL,
+        min_delta: float = NOISE_LEVEL_MIN_DELTA,
+    ):
+        self.callback = callback
+        self.min_interval = min_interval
+        self.min_delta = min_delta
+        self._last_db: float | None = None
+        self._last_time = 0.0
+
+    def maybe_publish(self, db: float) -> None:
+        now = time.time()
+        elapsed = now - self._last_time
+        delta = abs(db - self._last_db) if self._last_db is not None else float("inf")
+
+        if elapsed >= self.min_interval or delta >= self.min_delta:
+            self.callback(db)
+            self._last_db = db
+            self._last_time = now
+
+
 class AudioMonitor:
     """Continuously monitors the mic and yields trigger events + noise levels.
 
@@ -106,13 +163,16 @@ class AudioMonitor:
         hysteresis_chunks: int = 3,
         capture_duration: int = 10,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
+        device: int | None = None,
     ):
         self.gate = NoiseGate(noise_gate_db, hysteresis_chunks)
         self.capture = AudioCapture(
             duration=capture_duration,
             sample_rate=sample_rate,
+            device=device,
         )
         self.sample_rate = sample_rate
+        self.device = device
         self._chunk_samples = int(sample_rate * CHUNK_SECONDS)
 
     async def run(
@@ -120,25 +180,37 @@ class AudioMonitor:
         on_trigger: Callable[[bytes], None],
         on_noise_level: Callable[[float], None] | None = None,
     ) -> None:
+        logger.info(list_input_devices())
         logger.info(
-            "Audio monitor started (threshold=%.1f dBFS, hysteresis=%d s, sample_rate=%d Hz)",
+            "Audio monitor started (threshold=%.1f dBFS, hysteresis=%d s, "
+            "sample_rate=%d Hz, device=%s)",
             self.gate.threshold_db,
             self.gate.hysteresis_chunks,
             self.sample_rate,
+            self.device if self.device is not None else "default",
         )
+
+        throttler = NoiseLevelThrottler(on_noise_level) if on_noise_level else None
+
         while True:
             try:
-                chunk = await asyncio.to_thread(
-                    sd.rec,
-                    self._chunk_samples,
-                    samplerate=self.sample_rate,
-                    channels=CHANNELS,
-                    dtype=DTYPE,
-                    blocking=True,
-                )
+                kwargs = {
+                    "frames": self._chunk_samples,
+                    "samplerate": self.sample_rate,
+                    "channels": CHANNELS,
+                    "dtype": DTYPE,
+                    "blocking": True,
+                }
+                if self.device is not None:
+                    kwargs["device"] = self.device
+
+                chunk = await asyncio.to_thread(sd.rec, **kwargs)
                 db = compute_dbfs(chunk)
-                if on_noise_level is not None:
-                    on_noise_level(db)
+                logger.debug("Noise level: %.1f dBFS", db)
+
+                if throttler is not None:
+                    throttler.maybe_publish(db)
+
                 if self.gate.process(chunk):
                     logger.info("Noise gate triggered (%.1f dBFS)", db)
                     wav = await self.capture.capture_to_wav_async()

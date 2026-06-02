@@ -18,9 +18,11 @@ class Config:
     ha_discovery_prefix: str
     ha_enabled: bool
     sample_rate: int
+    sound_device: int | None
 
     @classmethod
     def from_env(cls) -> "Config":
+        raw_device = os.getenv("SOUND_DEVICE")
         return cls(
             device_name=os.getenv("DEVICE_NAME", "shazam"),
             mqtt_host=os.getenv("MQTT_HOST", "localhost"),
@@ -34,4 +36,5 @@ class Config:
             ha_discovery_prefix=os.getenv("HA_DISCOVERY_PREFIX", "homeassistant"),
             ha_enabled=os.getenv("HA_ENABLED", "true").lower() in ("1", "true", "yes"),
             sample_rate=int(os.getenv("SAMPLE_RATE", "44100")),
+            sound_device=int(raw_device) if raw_device else None,
         )
