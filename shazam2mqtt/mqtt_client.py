@@ -146,7 +146,8 @@ class MqttClient:
                     "noise_level",
                     self._t_noise,
                     icon="mdi:microphone",
-                    unit_of_measurement="dBFS",
+                    unit_of_measurement="dB",
+                    state_class="measurement",
                 ),
             ),
             # binary sensor

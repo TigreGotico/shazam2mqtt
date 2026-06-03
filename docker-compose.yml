@@ -24,6 +24,8 @@ services:
       - SOUND_DEVICE=${SOUND_DEVICE:-}
       - NOISE_LEVEL_INTERVAL=${NOISE_LEVEL_INTERVAL:-5.0}
       - NOISE_LEVEL_DELTA=${NOISE_LEVEL_DELTA:-3.0}
+      - REQUIRED_NO_MATCHES=${REQUIRED_NO_MATCHES:-2}
+      - QUIET_HYSTERESIS=${QUIET_HYSTERESIS:-5}
     # If your host uses PulseAudio instead of ALSA, comment out 'devices'
     # and uncomment the lines below (adjust UID/GID if needed):
     # volumes:

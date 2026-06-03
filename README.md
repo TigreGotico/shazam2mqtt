@@ -83,6 +83,8 @@ All settings are optional — sensible defaults are baked in.
 | `ALSA_CARD` | *(none)* | ALSA card name (e.g. `C615`). Forces the default capture device on PipeWire/ALSA hosts without fiddling with PortAudio indices. |
 | `NOISE_LEVEL_INTERVAL` | `5.0` | Minimum seconds between Noise Level sensor MQTT updates. |
 | `NOISE_LEVEL_DELTA` | `3.0` | dB change required to publish a Noise Level update immediately, bypassing the interval. |
+| `REQUIRED_NO_MATCHES` | `2` | Consecutive "no match" results from Shazam before the state flips from `playing` to `unknown/no-match`. Prevents brief drop-outs from resetting the display mid-track. |
+| `QUIET_HYSTERESIS` | `5` | Seconds of quiet audio before the state flips to `silent`. |
 
 ### Tuning the noise gate
 
@@ -112,7 +114,10 @@ Mic ──► Noise Gate (RMS) ──► 10 s Capture ──► xazam.identify()
 
 - **Idle loop** reads 1-second audio chunks and checks RMS energy.
 - **Trigger** requires 3 consecutive "loud" chunks (~3 s hysteresis) to avoid reacting to pops.
-- **State machine** prevents overlapping captures and rate-limits the Shazam API.
+- **State machine** has three states and prevents brief drop-outs from resetting the display:
+  - **`playing`** — Shazam matched a track.
+  - **`unknown/no-match`** — Room is loud but Shazam failed after `REQUIRED_NO_MATCHES` consecutive attempts.
+  - **`silence`** — Room has been quiet for `QUIET_HYSTERESIS` seconds.
 - **Command topic** `shazam2mqtt/<device_name>/command` accepts `listen_now` for manual triggers.
 
 ## Home Assistant entities (10 under one device)
@@ -184,7 +189,7 @@ If your host uses pure PulseAudio (not PipeWire), comment out the `devices:` blo
 | Topic | Type | Payload example |
 |-------|------|-----------------|
 | `shazam2mqtt/<name>/now_playing` | state | `Nothing Else Matters — Metallica` |
-| `shazam2mqtt/<name>/status` | status | `playing` / `unknown` / `silence` |
+| `shazam2mqtt/<name>/status` | status | `playing` / `unknown/no-match` / `silence` |
 | `shazam2mqtt/<name>/matched` | binary | `ON` / `OFF` |
 | `shazam2mqtt/<name>/track` | sensor | `Nothing Else Matters` |
 | `shazam2mqtt/<name>/artist` | sensor | `Metallica` |

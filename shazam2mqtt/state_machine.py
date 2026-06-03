@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class ShazamStateMachine:
-    """Orchestrates the identify-publish loop with a simple cooldown guard."""
+    """Orchestrates the identify-publish loop with a simple cooldown guard
+    and N-consecutive-no-match debounce.
+    """
 
     def __init__(self, config, mqtt: MqttClient):
         self.cfg = config
@@ -21,6 +23,8 @@ class ShazamStateMachine:
         self._last_trigger = 0.0
         self._last_track = ""
         self._busy = False
+        self._consecutive_no_matches = 0
+        self._same_song_flag = False
 
         # Register the command callback so HA can trigger a listen
         self.mqtt.set_listen_callback(self._on_listen_command)
@@ -55,6 +59,13 @@ class ShazamStateMachine:
         finally:
             self._busy = False
 
+    async def on_quiet(self) -> None:
+        """Called by the audio monitor when the room has been quiet for a while."""
+        self._consecutive_no_matches = 0
+        self._same_song_flag = False
+        self.mqtt.publish_silence()
+        logger.info("State -> silent (room quiet)")
+
     # ------------------------------------------------------------------ #
     # command handler
     # ------------------------------------------------------------------ #
@@ -75,12 +86,12 @@ class ShazamStateMachine:
             result = await self.shazam.identify(wav_bytes)
         except Exception as exc:
             logger.exception("Shazam identification failed: %s", exc)
-            self.mqtt.publish_unknown("Identification error")
+            self._handle_no_match("Identification error")
             return
 
         if not result.matched or not result.track:
             logger.info("Shazam returned no match")
-            self.mqtt.publish_unknown("No match")
+            self._handle_no_match("No match")
             return
 
         track = result.track
@@ -102,7 +113,7 @@ class ShazamStateMachine:
 
         self._publish_match(track, extra)
 
-        # Same-song cooldown
+        # Same-song cooldown logic
         if track_key and track_key == self._last_track:
             self._same_song_flag = True
             logger.info(
@@ -112,6 +123,26 @@ class ShazamStateMachine:
         else:
             self._same_song_flag = False
         self._last_track = track_key
+
+        # We got a match — reset the no-match counter
+        self._consecutive_no_matches = 0
+
+    def _handle_no_match(self, reason: str = "No match"):
+        """Increment no-match counter and only mark unknown after N consecutive failures."""
+        self._consecutive_no_matches += 1
+        required = self.cfg.required_no_matches
+
+        if self._consecutive_no_matches >= required:
+            logger.info(
+                "%d consecutive no-matches — state -> unknown/no-match", self._consecutive_no_matches
+            )
+            self.mqtt.publish_unknown(reason)
+        else:
+            logger.info(
+                "No match (%d/%d consecutive) — keeping previous state",
+                self._consecutive_no_matches,
+                required,
+            )
 
     def _publish_match(self, track, extra_track=None):
         """Publish a match using the rich typed Track model."""
@@ -138,6 +169,6 @@ class ShazamStateMachine:
 
     def _active_cooldown(self) -> int:
         """Return the cooldown duration that currently applies."""
-        if getattr(self, "_same_song_flag", False):
+        if self._same_song_flag:
             return self.cfg.same_song_cooldown_seconds
         return self.cfg.cooldown_seconds

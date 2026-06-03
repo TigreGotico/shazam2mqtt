@@ -151,8 +151,8 @@ class AudioMonitor:
     """Continuously monitors the mic and yields trigger events + noise levels.
 
     When the noise gate fires, this class captures a full clip and passes
-    it to the async ``on_trigger`` callback.  There is only *one* ``sd.rec``
-    call active at any moment, so PortAudio contention is avoided.
+    it to the async ``on_trigger`` callback.  When the room has been quiet
+    for ``quiet_hysteresis`` consecutive chunks, it calls ``on_quiet``.
     """
 
     def __init__(
@@ -164,6 +164,7 @@ class AudioMonitor:
         device: int | None = None,
         noise_level_interval: float = 5.0,
         noise_level_delta: float = 3.0,
+        quiet_hysteresis: int = 5,
     ):
         self.gate = NoiseGate(noise_gate_db, hysteresis_chunks)
         self.capture = AudioCapture(
@@ -175,21 +176,25 @@ class AudioMonitor:
         self.device = device
         self.noise_level_interval = noise_level_interval
         self.noise_level_delta = noise_level_delta
+        self.quiet_hysteresis = quiet_hysteresis
         self._chunk_samples = int(sample_rate * CHUNK_SECONDS)
+        self._quiet_streak = 0
 
     async def run(
         self,
         on_trigger: Callable[[bytes], None],
         on_noise_level: Callable[[float], None] | None = None,
+        on_quiet: Callable[[], None] | None = None,
     ) -> None:
         logger.info(list_input_devices())
         logger.info(
             "Audio monitor started (threshold=%.1f dBFS, hysteresis=%d s, "
-            "sample_rate=%d Hz, device=%s)",
+            "sample_rate=%d Hz, device=%s, quiet_hysteresis=%d s)",
             self.gate.threshold_db,
             self.gate.hysteresis_chunks,
             self.sample_rate,
             self.device if self.device is not None else "default",
+            self.quiet_hysteresis,
         )
 
         throttler = (
@@ -221,12 +226,20 @@ class AudioMonitor:
                 if throttler is not None:
                     throttler.maybe_publish(db)
 
-                if self.gate.process(chunk):
+                triggered = self.gate.process(chunk)
+                if triggered:
+                    self._quiet_streak = 0
                     logger.info("Noise gate triggered (%.1f dBFS)", db)
                     wav = await self.capture.capture_to_wav_async()
                     await on_trigger(wav)
                     await asyncio.sleep(1)
                     self.gate.reset()
+                else:
+                    self._quiet_streak += 1
+                    if on_quiet and self._quiet_streak >= self.quiet_hysteresis:
+                        logger.info("Room quiet for %d s", self.quiet_hysteresis)
+                        await on_quiet()
+                        self._quiet_streak = 0
             except sd.PortAudioError as exc:
                 logger.error("PortAudio error: %s", exc)
                 await asyncio.sleep(5)

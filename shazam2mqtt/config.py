@@ -21,6 +21,8 @@ class Config:
     sound_device: int | None
     noise_level_interval: float
     noise_level_delta: float
+    required_no_matches: int
+    quiet_hysteresis: int
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -41,4 +43,6 @@ class Config:
             sound_device=int(raw_device) if raw_device else None,
             noise_level_interval=float(os.getenv("NOISE_LEVEL_INTERVAL", "5.0")),
             noise_level_delta=float(os.getenv("NOISE_LEVEL_DELTA", "3.0")),
+            required_no_matches=int(os.getenv("REQUIRED_NO_MATCHES", "2")),
+            quiet_hysteresis=int(os.getenv("QUIET_HYSTERESIS", "5")),
         )

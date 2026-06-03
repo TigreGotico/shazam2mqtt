@@ -32,6 +32,7 @@ async def main():
         device=cfg.sound_device,
         noise_level_interval=cfg.noise_level_interval,
         noise_level_delta=cfg.noise_level_delta,
+        quiet_hysteresis=cfg.quiet_hysteresis,
     )
 
     # graceful shutdown
@@ -50,6 +51,7 @@ async def main():
         monitor.run(
             on_trigger=sm.on_trigger,
             on_noise_level=mqtt.publish_noise_level,
+            on_quiet=sm.on_quiet,
         )
     )
 
