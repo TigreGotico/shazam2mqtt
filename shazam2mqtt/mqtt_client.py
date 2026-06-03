@@ -209,6 +209,7 @@ class MqttClient:
             "confidence": confidence,
             "apple_music_url": url or "Unknown",
             "artwork_url": artwork_url or "Unknown",
+            "entity_picture": artwork_url or "",
         }
         if lyrics:
             attrs["lyrics"] = lyrics
