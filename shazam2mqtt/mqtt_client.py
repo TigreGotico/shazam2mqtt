@@ -148,6 +148,7 @@ class MqttClient:
                     icon="mdi:microphone",
                     unit_of_measurement="dB",
                     state_class="measurement",
+                    device_class="sound_pressure",
                 ),
             ),
             # binary sensor
