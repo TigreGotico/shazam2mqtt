@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any, Dict, List
 
-import paho.mqtt.client as mqtt
+from shazam2mqtt._mqtt import new_client
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class MqttClient:
 
     def __init__(self, config):
         self.cfg = config
-        self._client = mqtt.Client()
+        self._client = new_client(f"shazam2mqtt_{config.device_name}")
         if config.mqtt_user and config.mqtt_pass:
             self._client.username_pw_set(config.mqtt_user, config.mqtt_pass)
 
@@ -59,8 +59,9 @@ class MqttClient:
     # callbacks
     # ------------------------------------------------------------------ #
 
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, *args):
+        # reason_code is an int (paho 1.x) or ReasonCode (2.x); both == 0 on success.
+        if reason_code == 0:
             logger.info("MQTT connected")
             self.publish_availability("online")
             if self.cfg.ha_enabled:
@@ -68,10 +69,10 @@ class MqttClient:
             client.subscribe(self._command_topic)
             logger.info("Subscribed to %s", self._command_topic)
         else:
-            logger.error("MQTT connect failed (rc=%d)", rc)
+            logger.error("MQTT connect failed (rc=%s)", reason_code)
 
-    def _on_disconnect(self, client, userdata, rc):
-        logger.warning("MQTT disconnected (rc=%d)", rc)
+    def _on_disconnect(self, client, userdata, *args):
+        logger.warning("MQTT disconnected")
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
