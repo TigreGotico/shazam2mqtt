@@ -15,10 +15,21 @@ class ShazamStateMachine:
     and N-consecutive-no-match debounce.
     """
 
-    def __init__(self, config, mqtt: MqttClient):
+    def __init__(
+        self,
+        config,
+        mqtt: MqttClient,
+        force_listen: asyncio.Event | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
+    ):
         self.cfg = config
         self.mqtt = mqtt
         self.shazam = ShazamBridge()
+        # ``force_listen``/``loop`` back the listen_now MQTT command: the MQTT
+        # callback fires on paho's own thread, so setting the event has to be
+        # scheduled thread-safely onto the asyncio loop that owns it.
+        self.force_listen = force_listen
+        self._loop = loop
 
         self._last_trigger = 0.0
         self._last_track = ""
@@ -71,11 +82,14 @@ class ShazamStateMachine:
     # ------------------------------------------------------------------ #
 
     def _on_listen_command(self):
-        """MQTT command received — schedule an async listen."""
-        # We can't capture audio from the MQTT thread, but we can set a flag
-        # that the monitor checks on its next loop.  For now we just log;
-        # a full implementation would signal the monitor to force-capture.
-        logger.info("Command 'listen_now' received (not yet wired to forced capture)")
+        """MQTT command received (on the paho thread) — signal the audio
+        monitor to force-capture on its next loop iteration.
+        """
+        if self.force_listen is None or self._loop is None:
+            logger.warning("Command 'listen_now' received but no audio monitor is wired up")
+            return
+        logger.info("Command 'listen_now' received — scheduling forced capture")
+        self._loop.call_soon_threadsafe(self.force_listen.set)
 
     # ------------------------------------------------------------------ #
     # core cycle
