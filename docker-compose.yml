@@ -5,6 +5,12 @@ services:
     image: ghcr.io/tigregotico/shazam2mqtt:dev
     container_name: shazam2mqtt
     restart: unless-stopped
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     # Pass host ALSA device for microphone access
     devices:
       - /dev/snd:/dev/snd
