@@ -8,3 +8,8 @@ on:
 jobs:
   license_check:
     uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
+    with:
+      # paho-mqtt is dual-licensed "EPL-2.0 OR BSD-3-Clause"; we elect the
+      # permissive BSD-3-Clause option. Drop once the central whitelist ships
+      # (OpenVoiceOS/gh-automations#70).
+      exclude_packages: '(?i:^paho[-_]mqtt([=<>!~ @;].*)?$)'
