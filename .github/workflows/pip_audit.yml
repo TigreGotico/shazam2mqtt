@@ -8,3 +8,7 @@ on:
 jobs:
   pip_audit:
     uses: OpenVoiceOS/gh-automations/.github/workflows/pip-audit.yml@dev
+    with:
+      # shazamio-core (via xazam) has no cp314 wheel; its Rust sdist build
+      # (alsa-sys) needs the system ALSA headers.
+      system_deps: libasound2-dev

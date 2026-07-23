@@ -9,6 +9,9 @@ jobs:
   license_check:
     uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
     with:
+      # shazamio-core (via xazam) has no cp314 wheel; its Rust sdist build
+      # (alsa-sys) needs the system ALSA headers.
+      system_deps: libasound2-dev
       # paho-mqtt is dual-licensed "EPL-2.0 OR BSD-3-Clause"; we elect the
       # permissive BSD-3-Clause option. Drop once the central whitelist ships
       # (OpenVoiceOS/gh-automations#70).
