@@ -12,7 +12,8 @@ jobs:
       # shazamio-core (via xazam) has no cp314 wheel; its Rust sdist build
       # (alsa-sys) needs the system ALSA headers.
       system_deps: libasound2-dev
-      # paho-mqtt is dual-licensed "EPL-2.0 OR BSD-3-Clause"; we elect the
-      # permissive BSD-3-Clause option. Drop once the central whitelist ships
-      # (OpenVoiceOS/gh-automations#70).
-      exclude_packages: '(?i:^paho[-_]mqtt([=<>!~ @;].*)?$)'
+      # shazamio-core is MIT (github.com/shazamio/shazamio-core) but its sdist
+      # build ships no license metadata, so the checker reports category
+      # "Error". paho-mqtt is covered by the central whitelist since
+      # OpenVoiceOS/gh-automations#70.
+      exclude_packages: '(?i:^shazamio[-_]core([=<>!~ @;].*)?$)'
