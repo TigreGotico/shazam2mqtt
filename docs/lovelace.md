@@ -1,13 +1,13 @@
 # Home Assistant Dashboard Cards
 
-These cards go into your Lovelace UI (`Settings → Dashboards → Edit`).
+These cards go into the Lovelace UI (**Settings → Dashboards → Edit**).
 Replace `living_room` with whatever `DEVICE_NAME` you set.
 
 ---
 
 ## 1. Full "Now Playing" card (Markdown + artwork + lyrics)
 
-A rich card that shows the album cover, track/artist, metadata, streaming links, and lyrics.
+A rich card that shows the album cover, track and artist, metadata, streaming links, and lyrics.
 
 ```yaml
 type: markdown
@@ -50,7 +50,7 @@ content: >
 
 ## 2. Compact card with artwork picture
 
-Uses the `entity_picture` attribute natively — no camera workaround needed.
+Uses the `entity_picture` attribute directly. No camera workaround is needed.
 
 ```yaml
 type: vertical-stack
@@ -84,12 +84,12 @@ cards:
 
 ## 3. Mushroom Template card (needs [Mushroom](https://github.com/piitaya/lovelace-mushroom))
 
-Compact, modern look with picture and streaming links.
+A compact card with a picture and streaming links.
 
 ```yaml
 type: custom:mushroom-template-card
 primary: "{{ states('sensor.living_room_shazam_track') }}"
-secondary: "{{ states('sensor.living_room_shazam_artist') }} — {{ states('sensor.living_room_shazam_status') }}"
+secondary: "{{ states('sensor.living_room_shazam_artist') }} - {{ states('sensor.living_room_shazam_status') }}"
 icon: mdi:music-note
 entity: sensor.living_room_shazam_now_playing
 picture: "{{ state_attr('sensor.living_room_shazam_now_playing', 'entity_picture') }}"
@@ -119,7 +119,7 @@ fill_container: true
 
 ## 4. Mini player style
 
-A narrow strip showing only track, artist, and the album cover as background.
+A narrow strip that shows only the track, artist, and the album cover as background.
 
 ```yaml
 type: custom:mushroom-template-card
@@ -136,6 +136,9 @@ tap_action:
 
 ## Tips
 
-- **Old artwork lingering?** The `entity_picture` attribute is cleared automatically when the state becomes `unknown` or `silence`.
-- **Track too long?** Adjust `REQUIRED_NO_MATCHES` in your `.env` so brief drop-outs don't reset the card.
+- **Old artwork lingering?** The `entity_picture` attribute clears automatically when the state becomes `unknown` or `silence`.
+- **Track too long?** Adjust `REQUIRED_NO_MATCHES` in your `.env` file so brief drop-outs do not reset the card.
 - **Want lyrics in a separate card?** Extract just the lyrics block from card #1 into its own `markdown` card.
+
+---
+[← Home Assistant](home_assistant.md) · [Home](README.md) · [Troubleshooting →](troubleshooting.md)
