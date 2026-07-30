@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1a4](https://github.com/TigreGotico/shazam2mqtt/tree/0.1.1a4) (2026-07-30)
+
+[Full Changelog](https://github.com/TigreGotico/shazam2mqtt/compare/0.1.1a3...0.1.1a4)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#12](https://github.com/TigreGotico/shazam2mqtt/pull/12) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.1.1a3](https://github.com/TigreGotico/shazam2mqtt/tree/0.1.1a3) (2026-06-02)
 
 [Full Changelog](https://github.com/TigreGotico/shazam2mqtt/compare/0.1.1a2...0.1.1a3)
