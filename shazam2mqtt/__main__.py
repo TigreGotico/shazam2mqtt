@@ -24,7 +24,10 @@ async def main():
     mqtt = MqttClient(cfg)
     mqtt.connect()
 
-    sm = ShazamStateMachine(cfg, mqtt)
+    loop = asyncio.get_running_loop()
+    force_listen = asyncio.Event()
+
+    sm = ShazamStateMachine(cfg, mqtt, force_listen=force_listen, loop=loop)
     monitor = AudioMonitor(
         noise_gate_db=cfg.noise_gate_db,
         capture_duration=cfg.listen_duration,
@@ -36,7 +39,6 @@ async def main():
     )
 
     # graceful shutdown
-    loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
 
     def _on_signal(signum, frame):
@@ -52,6 +54,7 @@ async def main():
             on_trigger=sm.on_trigger,
             on_noise_level=mqtt.publish_noise_level,
             on_quiet=sm.on_quiet,
+            force_listen=force_listen,
         )
     )
 

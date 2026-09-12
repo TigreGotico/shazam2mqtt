@@ -9,7 +9,7 @@
 
 - Lower `NOISE_GATE_DB` (for example `-50`) so quieter audio triggers capture.
 - Move the mic closer to the speakers.
-- Check that the captured audio is clean. Use `mic_recording.py` to record a sample and listen to it.
+- Check that the captured audio is clean (use `examples/mic_recording.py` to record a sample and listen to it).
 
 ## Entity not appearing in Home Assistant
 

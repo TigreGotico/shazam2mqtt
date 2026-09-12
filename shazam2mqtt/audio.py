@@ -69,54 +69,15 @@ class NoiseGate:
         self._loud_streak = 0
 
 
-class AudioCapture:
-    """Capture fixed-duration audio from the default microphone."""
-
-    def __init__(
-        self,
-        duration: int = 10,
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
-        channels: int = CHANNELS,
-        device: int | None = None,
-    ):
-        self.duration = duration
-        self.sample_rate = sample_rate
-        self.channels = channels
-        self.device = device
-
-    def _rec_kwargs(self, frames: int) -> dict:
-        kwargs = {
-            "frames": frames,
-            "samplerate": self.sample_rate,
-            "channels": self.channels,
-            "dtype": DTYPE,
-            "blocking": True,
-        }
-        if self.device is not None:
-            kwargs["device"] = self.device
-        return kwargs
-
-    def capture(self) -> bytes:
-        """Record and return raw int16 mono bytes (not WAV wrapped)."""
-        logger.info("Capturing %d s of audio …", self.duration)
-        frames = self.duration * self.sample_rate
-        recording = sd.rec(**self._rec_kwargs(frames))
-        return recording.tobytes()
-
-    def capture_to_wav(self) -> bytes:
-        """Capture and return a complete in-memory WAV file."""
-        raw = self.capture()
-        buf = BytesIO()
-        with wave.open(buf, "wb") as wf:
-            wf.setnchannels(self.channels)
-            wf.setsampwidth(2)  # int16 = 2 bytes
-            wf.setframerate(self.sample_rate)
-            wf.writeframes(raw)
-        return buf.getvalue()
-
-    async def capture_to_wav_async(self) -> bytes:
-        """Async wrapper that offloads blocking capture to a thread."""
-        return await asyncio.to_thread(self.capture_to_wav)
+def wrap_wav(raw: bytes, sample_rate: int, channels: int = CHANNELS) -> bytes:
+    """Wrap raw int16 PCM bytes into a complete in-memory WAV file."""
+    buf = BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(2)  # int16 = 2 bytes
+        wf.setframerate(sample_rate)
+        wf.writeframes(raw)
+    return buf.getvalue()
 
 
 class NoiseLevelThrottler:
@@ -167,11 +128,7 @@ class AudioMonitor:
         quiet_hysteresis: int = 5,
     ):
         self.gate = NoiseGate(noise_gate_db, hysteresis_chunks)
-        self.capture = AudioCapture(
-            duration=capture_duration,
-            sample_rate=sample_rate,
-            device=device,
-        )
+        self.capture_duration = capture_duration
         self.sample_rate = sample_rate
         self.device = device
         self.noise_level_interval = noise_level_interval
@@ -180,11 +137,33 @@ class AudioMonitor:
         self._chunk_samples = int(sample_rate * CHUNK_SECONDS)
         self._quiet_streak = 0
 
+    def _open_stream(self) -> sd.InputStream:
+        kwargs = {
+            "samplerate": self.sample_rate,
+            "channels": CHANNELS,
+            "dtype": DTYPE,
+            "blocksize": self._chunk_samples,
+        }
+        if self.device is not None:
+            kwargs["device"] = self.device
+        stream = sd.InputStream(**kwargs)
+        stream.start()
+        return stream
+
+    async def _capture_clip(self, stream: sd.InputStream) -> bytes:
+        """Read a full capture-duration clip from the already-open stream."""
+        frames = self.capture_duration * self.sample_rate
+        data, overflowed = await asyncio.to_thread(stream.read, frames)
+        if overflowed:
+            logger.debug("Input overflow while capturing clip")
+        return wrap_wav(data.tobytes(), self.sample_rate)
+
     async def run(
         self,
         on_trigger: Callable[[bytes], None],
         on_noise_level: Callable[[float], None] | None = None,
         on_quiet: Callable[[], None] | None = None,
+        force_listen: asyncio.Event | None = None,
     ) -> None:
         logger.info(list_input_devices())
         logger.info(
@@ -207,42 +186,61 @@ class AudioMonitor:
             else None
         )
 
-        while True:
-            try:
-                kwargs = {
-                    "frames": self._chunk_samples,
-                    "samplerate": self.sample_rate,
-                    "channels": CHANNELS,
-                    "dtype": DTYPE,
-                    "blocking": True,
-                }
-                if self.device is not None:
-                    kwargs["device"] = self.device
+        stream: sd.InputStream | None = None
+        try:
+            while True:
+                try:
+                    if stream is None:
+                        stream = self._open_stream()
 
-                chunk = await asyncio.to_thread(sd.rec, **kwargs)
-                db = compute_dbfs(chunk)
-                logger.debug("Noise level: %.1f dBFS", db)
-
-                if throttler is not None:
-                    throttler.maybe_publish(db)
-
-                triggered = self.gate.process(chunk)
-                if triggered:
-                    self._quiet_streak = 0
-                    logger.info("Noise gate triggered (%.1f dBFS)", db)
-                    wav = await self.capture.capture_to_wav_async()
-                    await on_trigger(wav)
-                    await asyncio.sleep(1)
-                    self.gate.reset()
-                else:
-                    self._quiet_streak += 1
-                    if on_quiet and self._quiet_streak >= self.quiet_hysteresis:
-                        logger.info("Room quiet for %d s", self.quiet_hysteresis)
-                        await on_quiet()
+                    if force_listen is not None and force_listen.is_set():
+                        force_listen.clear()
+                        logger.info("Forced listen requested — capturing now")
+                        wav = await self._capture_clip(stream)
+                        await on_trigger(wav)
                         self._quiet_streak = 0
-            except sd.PortAudioError as exc:
-                logger.error("PortAudio error: %s", exc)
-                await asyncio.sleep(5)
-            except Exception as exc:
-                logger.exception("Unexpected error in audio monitor: %s", exc)
-                await asyncio.sleep(1)
+                        self.gate.reset()
+                        continue
+
+                    data, overflowed = await asyncio.to_thread(stream.read, self._chunk_samples)
+                    if overflowed:
+                        logger.debug("Input overflow while monitoring")
+                    chunk = data
+                    db = compute_dbfs(chunk)
+                    logger.debug("Noise level: %.1f dBFS", db)
+
+                    if throttler is not None:
+                        throttler.maybe_publish(db)
+
+                    triggered = self.gate.process(chunk)
+                    if triggered:
+                        self._quiet_streak = 0
+                        logger.info("Noise gate triggered (%.1f dBFS)", db)
+                        wav = await self._capture_clip(stream)
+                        await on_trigger(wav)
+                        await asyncio.sleep(1)
+                        self.gate.reset()
+                    else:
+                        self._quiet_streak += 1
+                        if on_quiet and self._quiet_streak >= self.quiet_hysteresis:
+                            logger.info("Room quiet for %d s", self.quiet_hysteresis)
+                            await on_quiet()
+                            self._quiet_streak = 0
+                except sd.PortAudioError as exc:
+                    logger.error("PortAudio error: %s — reopening stream in 5s", exc)
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except Exception:
+                            pass
+                        stream = None
+                    await asyncio.sleep(5)
+                except Exception as exc:
+                    logger.exception("Unexpected error in audio monitor: %s", exc)
+                    await asyncio.sleep(1)
+        finally:
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass

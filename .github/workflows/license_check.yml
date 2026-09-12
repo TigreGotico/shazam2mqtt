@@ -8,3 +8,12 @@ on:
 jobs:
   license_check:
     uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
+    with:
+      # shazamio-core (via xazam) has no cp314 wheel; its Rust sdist build
+      # (alsa-sys) needs the system ALSA headers.
+      system_deps: libasound2-dev
+      # shazamio-core is MIT (github.com/shazamio/shazamio-core) but its sdist
+      # build ships no license metadata, so the checker reports category
+      # "Error". paho-mqtt is covered by the central whitelist since
+      # OpenVoiceOS/gh-automations#70.
+      exclude_packages: '(?i:^shazamio[-_]core([=<>!~ @;].*)?$)'
